@@ -8,6 +8,6 @@
 
 # Roblox-ts files
 /node_modules
-/out
+
 /include
 *.tsbuildinfo
