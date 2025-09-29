@@ -18,16 +18,16 @@ local Signal = {}
 local function listInsert(list, callback)
 	local newList = {}
 	local listLen = #list
-		
+
 	for i = 1, listLen do
 		newList[i] = list[i]
 	end
 
 	table.insert(newList, callback)
-		
+
 	return newList
 end
-	
+
 local function listValueRemove(list, value)
 	local newList = {}
 
@@ -36,15 +36,15 @@ local function listValueRemove(list, value)
 			table.insert(newList, list[i])
 		end
 	end
-		
+
 	return newList
 end
 
 function Signal.new<T...>(): Signal<T...>
 	local signal = {} :: Signal<T...>
-	
+
 	local boundCallbacks = {}
-	
+
 	function signal:Connect(callback: (T...) -> ()): SignalConnection
 
 		boundCallbacks = listInsert(boundCallbacks, callback)
@@ -54,17 +54,17 @@ function Signal.new<T...>(): Signal<T...>
         function SignalConnection.Disconnect()
             boundCallbacks = listValueRemove(boundCallbacks, callback)
         end
-		
+
 		return SignalConnection
 	end
-	
+
 	function signal:Fire(...: T...)
 
 		for _, callback in ipairs(boundCallbacks) do
 			task.spawn(callback, ...)
 		end
 	end
-	
+
 	function signal:Destroy()
 		boundCallbacks = {}
 	end

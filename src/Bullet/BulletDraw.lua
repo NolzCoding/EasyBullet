@@ -30,7 +30,6 @@ local function createBulletPart(addToCache: boolean): (Part | CylinderHandleAdor
             newBulletInstance.CanCollide = false
             newBulletInstance.CanTouch = false
             newBulletInstance.CanQuery = false
-            newBulletInstance.CollisionGroup = "EasyBullet"
             newBulletInstance.Material = Enum.Material.Neon
         else
             newBulletInstance = Instance.new("CylinderHandleAdornment")

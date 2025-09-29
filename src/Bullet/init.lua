@@ -79,7 +79,6 @@ function Bullet.new(shootingPlayer: Player?, barrelPosition: Vector3, velocity: 
     self.RayParams = RaycastParams.new()
     self.RayParams.FilterDescendantsInstances = easyBulletSettings.FilterList or {}
     self.RayParams.FilterType = easyBulletSettings.FilterType or Enum.RaycastFilterType.Exclude
-    self.RayParams.CollisionGroup = "EasyBullet"
 
     if RunService:IsClient() and easyBulletSettings.RenderBullet then
         self._bulletDraw = BulletDraw.new(easyBulletSettings.BulletColor, easyBulletSettings.BulletThickness, self.EasyBulletSettings.BulletPartProps)
