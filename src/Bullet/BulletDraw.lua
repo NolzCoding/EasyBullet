@@ -11,7 +11,7 @@ local ClientFPS = 1/RunService.Heartbeat:Wait()
 
 if RunService:IsClient() then
     RunService.Heartbeat:Connect(function(dt)
-        ClientFPS = 1 / dt 
+        ClientFPS = 1 / dt
     end)
 end
 
@@ -25,11 +25,12 @@ local function createBulletPart(addToCache: boolean): (Part | CylinderHandleAdor
             newBulletInstance = Instance.new("Part") :: Part
 
             if not newBulletInstance:IsA("Part") then return end
-            
+
             newBulletInstance.Anchored = true
             newBulletInstance.CanCollide = false
             newBulletInstance.CanTouch = false
             newBulletInstance.CanQuery = false
+            newBulletInstance.CollisionGroup = "EasyBullet"
             newBulletInstance.Material = Enum.Material.Neon
         else
             newBulletInstance = Instance.new("CylinderHandleAdornment")
@@ -92,7 +93,7 @@ export type BulletDraw = typeof(setmetatable({} :: BulletDrawProps, BulletDraw))
 
 function BulletDraw.new(bulletColor: Color3, bulletThickness: number, bulletPartProps: {[string]: unknown})
     local self = setmetatable({} :: BulletDrawProps, BulletDraw)
-    
+
     self.BulletColor = bulletColor
     self.BulletThickness = bulletThickness
     self.BulletPartProps = bulletPartProps or {}
@@ -101,7 +102,7 @@ function BulletDraw.new(bulletColor: Color3, bulletThickness: number, bulletPart
     self.BulletPart = nil :: (Part | CylinderHandleAdornment)?
 
     self:_updateBulletProps()
-    
+
     return self
 end
 
@@ -119,7 +120,7 @@ function BulletDraw.Draw(self: BulletDraw, pos0: Vector3, pos1: Vector3)
     end
 
     local diff = pos0 - pos1
-    
+
     if self.BulletPart:IsA("Part") then
         self.BulletPart.Size = Vector3.new(self.BulletThickness, self.BulletThickness, diff.Magnitude)
         self.BulletPart.CFrame = CFrame.lookAt(pos0, pos1) * CFrame.new(0,0, -diff.Magnitude * .5)
@@ -145,7 +146,7 @@ function BulletDraw._updateBulletProps(self: BulletDraw)
 
         assert(self.BulletPart, "Didn't getBulletPart()")
     end
-    
+
     if self.BulletPart and self.BulletPart:IsA("Part") then
         self.BulletPart.Color = self.BulletColor
 
@@ -157,7 +158,7 @@ function BulletDraw._updateBulletProps(self: BulletDraw)
                 warn(`Cannot set Color from BulletPartProps. Use EasyBulletSettings.BulletColor instead`)
                 continue
             end
-            
+
             if self.BulletPart[key] then
                 self.BulletPart[key] = value
             end
