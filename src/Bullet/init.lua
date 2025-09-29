@@ -143,7 +143,7 @@ end
 
 function Bullet.Destroy(self: Bullet)
     self._isDestroyed = true
-    
+
     if self._bulletDraw then
         self._bulletDraw:Destroy()
         self._bulletDraw = nil
