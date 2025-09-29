@@ -81,6 +81,11 @@ local function overrideDefaults(newEasyBulletSettings: Bullet.EasyBulletSettings
 	return defaultSettings
 end
 
+
+
+-- Make a deep copy of a table to avoid shared mutations between shots
+
+
 local constructedEasyBullet
 
 local EasyBullet = {}
@@ -121,11 +126,24 @@ end
 function EasyBullet:FireBullet(barrelPosition: Vector3, bulletVelocity: Vector3, easyBulletSettings: Bullet.EasyBulletSettings?)
 	assert(barrelPosition, `EasyBullet:FireBullet requires 2 parameters: a Vector3 position to start the bullet from, and a Velocity Vector3 of the direction to fire the bullet, with a magnitude of the initial velocity`)
 	assert(bulletVelocity, `EasyBullet:FireBullet requires 2 parameters: a Vector3 position to start the bullet from, and a Velocity Vector3 of the direction to fire the bullet, with a magnitude of the initial velocity`)
-	
+
 	assert(typeof(barrelPosition) == "Vector3", "The first parameter to EasyBullet:FireBullet must be a Vector3")
 	assert(typeof(bulletVelocity) == "Vector3", "The second parameter to EasyBullet:FireBullet must be a Vector3")
 
-	local thisEasyBulletSettings = optionalTableMerge(easyBulletSettings or {} :: Bullet.EasyBulletSettings, self.EasyBulletSettings)
+    -- Create a per-shot copy of settings to prevent shared table mutations across bullets
+    local providedSettings = table.clone(easyBulletSettings or {} :: Bullet.EasyBulletSettings)
+    local thisEasyBulletSettings = optionalTableMerge(providedSettings, self.EasyBulletSettings)
+
+    -- Ensure nested tables are not shared references
+    thisEasyBulletSettings.BulletData = table.clone(thisEasyBulletSettings.BulletData or {})
+    thisEasyBulletSettings.BulletPartProps = table.clone(thisEasyBulletSettings.BulletPartProps or {})
+
+    local origFilterList = thisEasyBulletSettings.FilterList or {}
+    local newFilterList = table.create(#origFilterList)
+    for i = 1, #origFilterList do
+        newFilterList[i] = origFilterList[i]
+    end
+    thisEasyBulletSettings.FilterList = newFilterList
 
 	-- Create a UUID linked to this bullet so it can be referenced over the network later
 	local bulletId = HttpService:GenerateGUID()
@@ -140,7 +158,7 @@ function EasyBullet:FireBullet(barrelPosition: Vector3, bulletVelocity: Vector3,
 		end
 
 		self:_fireBullet(nil, barrelPosition, bulletVelocity, 0, thisEasyBulletSettings)
-	
+
 	-- Client
 	elseif RunService:IsClient() then
 		if not self.FiredRemote then
@@ -176,7 +194,7 @@ function EasyBullet:_destroyBullet(bulletToDestroy: Bullet.Bullet | string)
 	else
 		local tryBulletId = bulletToDestroy.EasyBulletSettings.BulletData.BulletId
 		assert(type(tryBulletId) == "string", "Cannot destroy bullet as EasyBullet did not assign a BulletId for this bullet.")
-		
+
 		bulletId = tryBulletId
 		bullet = bulletToDestroy
 	end
@@ -205,15 +223,15 @@ function EasyBullet._fireBullet(self: EasyBullet, shootingPlayer: Player?, barre
 
 	local bulletId = easyBulletSettings.BulletData.BulletId
 	assert(type(bulletId) == "string", "EasyBullet did not assign a BulletId for this bullet.")
-	
+
 	-- Let users filter bullets being fired
 	if self.ShouldFireCallback then
 		local shouldFire = self.ShouldFireCallback(shootingPlayer, barrelPos, velocity, ping, easyBulletSettings)
-		
+
 		assert(type(shouldFire) == "boolean", `The callback bound by EasyBullet:BindShouldFire must return a boolean, shouldFireCallback returned: {typeof(shouldFire)}`)
-		
+
 		if shouldFire == false then
-			
+
 			assert(self.CanceledRemote ~= nil, "self.CanceledRemote does not reference ReplicatedStorage.EasyBulletCanceled")
 
 			if RunService:IsServer() then
@@ -273,7 +291,7 @@ function EasyBullet:_bindEvents()
 			-- Replicate shot to all other clients
 			for _, v in ipairs(Players:GetPlayers()) do
 				if v == player then continue end
-				
+
 				local thisPing = v:GetNetworkPing()
 
 				self.FiredRemote:FireClient(v, player, barrelPos, velocity, ping + thisPing, easyBulletSettings)
@@ -325,14 +343,14 @@ function EasyBullet:_bindEvents()
 			warn("No RemoteEvent named 'EasyBulletCanceled' found as a child of ReplicatedStorage")
 			return
 		end
-		
+
 		-- Handle the FiredRemote
 		self.FiredRemote.OnClientEvent:Connect(function(shootingPlayer: Player, barrelPos: Vector3, velocity: Vector3, accumulatedPing: number, easyBulletSettings: Bullet.EasyBulletSettings)
 			-- The server shouldn't ever replicate back a shot this client fired, but check that just to be safe.
 			if shootingPlayer == Players.LocalPlayer then
 				return
 			end
-			
+
 			self:_fireBullet(shootingPlayer, barrelPos, velocity, accumulatedPing, easyBulletSettings)
 		end)
 

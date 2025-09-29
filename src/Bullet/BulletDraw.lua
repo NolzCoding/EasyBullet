@@ -31,6 +31,13 @@ local function createBulletPart(addToCache: boolean): (Part | CylinderHandleAdor
             newBulletInstance.CanTouch = false
             newBulletInstance.CanQuery = false
             newBulletInstance.Material = Enum.Material.Neon
+            -- Prevent bullet from colliding with its own raycasts via collision groups
+            local ok, err = pcall(function()
+                newBulletInstance.CollisionGroup = "EasyBullet"
+            end)
+            if not ok then
+                warn(err)
+            end
         else
             newBulletInstance = Instance.new("CylinderHandleAdornment")
         end
