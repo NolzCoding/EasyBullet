@@ -71,7 +71,7 @@ function Bullet.new(shootingPlayer: Player?, barrelPosition: Vector3, velocity: 
     local self = setmetatable({} :: BulletProps, Bullet)
 
     self.Shooter = shootingPlayer
-    
+
     self.BarrelPosition = barrelPosition
     self.Velocity = velocity
     self.EasyBulletSettings = easyBulletSettings
@@ -79,11 +79,12 @@ function Bullet.new(shootingPlayer: Player?, barrelPosition: Vector3, velocity: 
     self.RayParams = RaycastParams.new()
     self.RayParams.FilterDescendantsInstances = easyBulletSettings.FilterList or {}
     self.RayParams.FilterType = easyBulletSettings.FilterType or Enum.RaycastFilterType.Exclude
-    
+    self.RayParams.CollisionGroup = "EasyBullet"
+
     if RunService:IsClient() and easyBulletSettings.RenderBullet then
         self._bulletDraw = BulletDraw.new(easyBulletSettings.BulletColor, easyBulletSettings.BulletThickness, self.EasyBulletSettings.BulletPartProps)
     end
-    
+
     self._lastPosition = barrelPosition
     self.StartTime = 0
 
@@ -96,7 +97,7 @@ end
 function Bullet.Start(self: Bullet, ping: number?)
     self.StartTime = os.clock()
 
-    if ping then 
+    if ping then
         self.StartTime -= ping
     end
 end
@@ -117,7 +118,7 @@ function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Ve
     else
         rayResult = raycast(lastPosition, currentPosition, self.RayParams)
     end
-    
+
     self:_handleRayResult(rayResult)
 
     if self._bulletDraw then
@@ -168,7 +169,7 @@ function Bullet:_handleRayResult(raycastResult: RaycastResult?)
     local hitVelocity = KinematicEquations:GetFinalVelocityFromTime(self.Velocity, acceleration, elapsedTime)
 
     local bulletData = self.EasyBulletSettings.BulletData
-    
+
     bulletData.HitVelocity = hitVelocity
 
     local hitHumanoid = recursiveHumanoidCheck(raycastResult.Instance)
