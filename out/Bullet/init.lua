@@ -37,6 +37,7 @@ type BulletProps = {
     StartTime: number,
     _bulletDraw: BulletDraw.BulletDraw?,
     _lastPosition: Vector3,
+    _isDestroyed: boolean,
 }
 
 local function raycast(v0: Vector3, v1: Vector3, rayparams: RaycastParams)
@@ -86,6 +87,7 @@ function Bullet.new(shootingPlayer: Player?, barrelPosition: Vector3, velocity: 
 
     self._lastPosition = barrelPosition
     self.StartTime = 0
+    self._isDestroyed = false
 
     self.BulletHit = Signal.new()
     self.BelowFallenParts = Signal.new()
@@ -102,6 +104,11 @@ function Bullet.Start(self: Bullet, ping: number?)
 end
 
 function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Vector3?)
+    -- Early return if bullet has been destroyed
+    if self._isDestroyed then
+        return
+    end
+
     local lastPosition = self._lastPosition
     local currentPosition, elapsedTime = self:_getCurrentPositionAndLifetime()
 
@@ -120,6 +127,11 @@ function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Ve
 
     self:_handleRayResult(rayResult)
 
+    -- Early return if bullet was destroyed by hit
+    if self._isDestroyed then
+        return
+    end
+
     if self._bulletDraw then
         self._bulletDraw:Draw(lastPosition, currentPosition)
     end
@@ -130,6 +142,8 @@ function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Ve
 end
 
 function Bullet.Destroy(self: Bullet)
+    self._isDestroyed = true
+    
     if self._bulletDraw then
         self._bulletDraw:Destroy()
         self._bulletDraw = nil
