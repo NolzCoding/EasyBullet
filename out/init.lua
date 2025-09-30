@@ -41,7 +41,7 @@ type EasyBulletMethods = {
 	BindCustomCast: (self: EasyBullet, callback: Bullet.CastCallback) -> (),
 	BindShouldFire: (self: EasyBullet, callback: ShouldFireCallback) -> (),
     BindShouldFireArray: (self: EasyBullet, callback: ShouldFireArrayCallback) -> (),
-	_fireBullet: (self: EasyBullet, shootingPlayer: Player?, barrelPos: Vector3, velocity: Vector3, ping: number, easyBulletSettings: Bullet.EasyBulletSettings?) -> (),
+    _fireBullet: (self: EasyBullet, shootingPlayer: Player?, barrelPos: Vector3, velocity: Vector3, ping: number, easyBulletSettings: Bullet.EasyBulletSettings?, skipShouldFire: boolean?) -> (),
     _fireBullets: (self: EasyBullet, shootingPlayer: Player?, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, ping: number) -> (),
 	_bindEvents: () -> (),
 }
@@ -165,7 +165,7 @@ function EasyBullet:FireBullet(barrelPosition: Vector3, bulletVelocity: Vector3,
 			self.FiredRemote:FireClient(v, nil, barrelPosition, bulletVelocity, thisPing, thisEasyBulletSettings)
 		end
 
-		self:_fireBullet(nil, barrelPosition, bulletVelocity, 0, thisEasyBulletSettings)
+        self:_fireBullet(nil, barrelPosition, bulletVelocity, 0, thisEasyBulletSettings, false)
 
 	-- Client
 	elseif RunService:IsClient() then
@@ -176,7 +176,7 @@ function EasyBullet:FireBullet(barrelPosition: Vector3, bulletVelocity: Vector3,
 
 		self.FiredRemote:FireServer(barrelPosition, bulletVelocity, thisEasyBulletSettings)
 
-		self:_fireBullet(Players.LocalPlayer, barrelPosition, bulletVelocity, 0, thisEasyBulletSettings)
+        self:_fireBullet(Players.LocalPlayer, barrelPosition, bulletVelocity, 0, thisEasyBulletSettings, false)
 	end
 end
 
@@ -302,13 +302,13 @@ function EasyBullet:_destroyBullet(bulletToDestroy: Bullet.Bullet | string)
 	end
 end
 
-function EasyBullet._fireBullet(self: EasyBullet, shootingPlayer: Player?, barrelPos: Vector3, velocity: Vector3, ping: number, easyBulletSettings: Bullet.EasyBulletSettings)
+function EasyBullet._fireBullet(self: EasyBullet, shootingPlayer: Player?, barrelPos: Vector3, velocity: Vector3, ping: number, easyBulletSettings: Bullet.EasyBulletSettings, skipShouldFire: boolean?)
 
 	local bulletId = easyBulletSettings.BulletData.BulletId
 	assert(type(bulletId) == "string", "EasyBullet did not assign a BulletId for this bullet.")
 
 	-- Let users filter bullets being fired
-	if self.ShouldFireCallback then
+    if not skipShouldFire and self.ShouldFireCallback then
 		local shouldFire = self.ShouldFireCallback(shootingPlayer, barrelPos, velocity, ping, easyBulletSettings)
 
 		assert(type(shouldFire) == "boolean", `The callback bound by EasyBullet:BindShouldFire must return a boolean, shouldFireCallback returned: {typeof(shouldFire)}`)
@@ -317,7 +317,7 @@ function EasyBullet._fireBullet(self: EasyBullet, shootingPlayer: Player?, barre
 
 			assert(self.CanceledRemote ~= nil, "self.CanceledRemote does not reference ReplicatedStorage.EasyBulletCanceled")
 
-			if RunService:IsServer() then
+            if RunService:IsServer() then
 				self.CanceledRemote:FireAllClients(bulletId)
 			elseif RunService:IsClient() then
 				self.CanceledRemote:FireServer(bulletId)
@@ -350,7 +350,7 @@ end
 
 function EasyBullet._fireBullets(self: EasyBullet, shootingPlayer: Player?, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, ping: number)
     for _, b in ipairs(bullets) do
-        self:_fireBullet(shootingPlayer, b.BarrelPosition, b.Velocity, ping, b.EasyBulletSettings)
+        self:_fireBullet(shootingPlayer, b.BarrelPosition, b.Velocity, ping, b.EasyBulletSettings, true)
     end
 end
 
@@ -389,7 +389,7 @@ function EasyBullet:_bindEvents()
 			end
 
 			-- Start handling the shot on the server
-			self:_fireBullet(player, barrelPos, velocity, ping, easyBulletSettings)
+            self:_fireBullet(player, barrelPos, velocity, ping, easyBulletSettings, false)
 		end)
 
 		-- Handle batch fired bullets from a client
@@ -464,7 +464,7 @@ function EasyBullet:_bindEvents()
 				return
 			end
 
-			self:_fireBullet(shootingPlayer, barrelPos, velocity, accumulatedPing, easyBulletSettings)
+            self:_fireBullet(shootingPlayer, barrelPos, velocity, accumulatedPing, easyBulletSettings, false)
 		end)
 
 		-- Handle batch fired bullets
