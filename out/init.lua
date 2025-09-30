@@ -401,6 +401,22 @@ function EasyBullet:_bindEvents()
 
 			local ping = player:GetNetworkPing()
 
+			-- group-level server gate
+			if self.ShouldFireArrayCallback then
+				local allow = self.ShouldFireArrayCallback(player, bullets, ping)
+				assert(type(allow) == "boolean", `The callback bound by EasyBullet:BindShouldFireArray must return a boolean, returned: {typeof(allow)}`)
+				if allow == false then
+					-- cancel locally spawned bullets on the firing client
+					for _, b in ipairs(bullets) do
+						local id = b.EasyBulletSettings.BulletData.BulletId
+						if typeof(id) == "string" then
+							self.CanceledRemote:FireClient(player, id)
+						end
+					end
+					return
+				end
+			end
+
 			-- replicate to others
 			for _, v in ipairs(Players:GetPlayers()) do
 				if v == player then continue end
