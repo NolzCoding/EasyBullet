@@ -16,6 +16,18 @@ type EasyBulletSettings = {
 	BulletData: BulletData
 }
 
+type FireBulletsBullet = {
+	Velocity: Vector3
+	BarrelPosition?: Vector3
+	Settings?: Partial<EasyBulletSettings>
+}
+
+type ShouldFireArrayCallback = (
+	shooter: Player | undefined,
+	bullets: { BarrelPosition: Vector3; Velocity: Vector3; EasyBulletSettings: EasyBulletSettings }[],
+	ping: number,
+) => boolean
+
 type CustomCastCallback = (
 	shooter: Player | undefined,
 	lastFramePosition: Vector3,
@@ -34,10 +46,12 @@ type ShouldFireCallback = (
 
 interface EasyBullet {
 	FireBullet(barrelPosition: Vector3, bulletVelocity: Vector3, easyBulletSettings?: EasyBulletSettings): void
+	FireBullets(bullets: FireBulletsBullet[]): void
 
 	BindCustomCast(castCallback: CustomCastCallback): void
 
 	BindShouldFire(shouldFireCallback: ShouldFireCallback): void
+	BindShouldFireArray(shouldFireArrayCallback: ShouldFireArrayCallback): void
 
 	BulletHit: Signal // (shootingPlayer?: Player, raycastResult: RaycastResult, bulletData: BulletData)
 	BulletHitHumanoid: Signal // (shootingPlayer?: Player, raycastResult: RaycastResult, hitHumanoid: Humanoid, bulletData: BulletData)
