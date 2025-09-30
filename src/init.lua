@@ -13,6 +13,7 @@ local Bullet = require(script:WaitForChild("Bullet"))
 local Signal = require(script:WaitForChild("Signal"))
 
 export type ShouldFireCallback = (shooter: Player?, barrelPosition: Vector3, velocity: Vector3, ping: number, easyBulletSettings: Bullet.EasyBulletSettings?) -> boolean
+export type ShouldFireArrayCallback = (shooter: Player?, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, ping: number) -> boolean
 
 type EasyBulletProps = {
 	EasyBulletSettings: Bullet.EasyBulletSettings,
@@ -26,17 +27,22 @@ type EasyBulletProps = {
 	BelowFallenPartsConnections: {[string]: Signal.SignalConnection},
 
 	FiredRemote: RemoteEvent?,
+    FiredBatchRemote: RemoteEvent?,
 	CanceledRemote: RemoteEvent?,
 
 	CustomCastCallback: Bullet.CastCallback?, --(Player?, Vector3, Vector3, number, Bullet.BulletData) -> ()?,
-	ShouldFireCallback: ShouldFireCallback?
+    ShouldFireCallback: ShouldFireCallback?,
+    ShouldFireArrayCallback: ShouldFireArrayCallback?,
 }
 
 type EasyBulletMethods = {
 	FireBullet: (self: EasyBullet, barrelPosition: Vector3, bulletVelocity: Vector3, easyBulletSettings: Bullet.EasyBulletSettings?) -> (),
+    FireBullets: (self: EasyBullet, bullets: { [number]: { Velocity: Vector3, BarrelPosition: Vector3?, Settings: Bullet.EasyBulletSettings? } }) -> (),
 	BindCustomCast: (self: EasyBullet, callback: Bullet.CastCallback) -> (),
 	BindShouldFire: (self: EasyBullet, callback: ShouldFireCallback) -> (),
+    BindShouldFireArray: (self: EasyBullet, callback: ShouldFireArrayCallback) -> (),
 	_fireBullet: (self: EasyBullet, shootingPlayer: Player?, barrelPos: Vector3, velocity: Vector3, ping: number, easyBulletSettings: Bullet.EasyBulletSettings?) -> (),
+    _fireBullets: (self: EasyBullet, shootingPlayer: Player?, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, ping: number) -> (),
 	_bindEvents: () -> (),
 }
 
@@ -111,10 +117,12 @@ function EasyBullet.new(easyBulletSettings: Bullet.EasyBulletSettings?)
 	self.BelowFallenPartsConnections = {} :: {[string]: Signal.SignalConnection}
 
 	self.FiredRemote = nil
+    self.FiredBatchRemote = nil
 	self.CanceledRemote = nil
 
 	self.CustomCastCallback = nil
 	self.ShouldFireCallback = nil
+    self.ShouldFireArrayCallback = nil
 
 	self:_bindEvents()
 
@@ -172,6 +180,75 @@ function EasyBullet:FireBullet(barrelPosition: Vector3, bulletVelocity: Vector3,
 	end
 end
 
+function EasyBullet:FireBullets(bullets: { [number]: { Velocity: Vector3, BarrelPosition: Vector3?, Settings: Bullet.EasyBulletSettings? } })
+    assert(bullets and #bullets > 0, "EasyBullet:FireBullets requires a non-empty array of bullets")
+
+    local resolvedBullets = {} :: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }
+
+    for i, b in ipairs(bullets) do
+        assert(typeof(b.Velocity) == "Vector3", `Bullet at index {i} missing Velocity: Vector3`)
+
+        local barrelPos = b.BarrelPosition or Vector3.zero
+
+        local providedSettings = table.clone(b.Settings or {} :: Bullet.EasyBulletSettings)
+        local thisSettings = optionalTableMerge(providedSettings, self.EasyBulletSettings)
+        thisSettings.BulletData = table.clone(thisSettings.BulletData or {})
+        thisSettings.BulletPartProps = table.clone(thisSettings.BulletPartProps or {})
+
+        local origFilterList = thisSettings.FilterList or {}
+        local newFilterList = table.create(#origFilterList)
+        for j = 1, #origFilterList do
+            newFilterList[j] = origFilterList[j]
+        end
+        thisSettings.FilterList = newFilterList
+
+        local bulletId = HttpService:GenerateGUID()
+        thisSettings.BulletData.BulletId = bulletId
+
+        table.insert(resolvedBullets, {
+            BarrelPosition = barrelPos,
+            Velocity = b.Velocity,
+            EasyBulletSettings = thisSettings,
+        })
+    end
+
+    if RunService:IsServer() then
+        -- group-level gate on server if provided
+        if self.ShouldFireArrayCallback then
+            local shouldFire = self.ShouldFireArrayCallback(nil, resolvedBullets, 0)
+            assert(type(shouldFire) == "boolean", `The callback bound by EasyBullet:BindShouldFireArray must return a boolean, returned: {typeof(shouldFire)}`)
+            if shouldFire == false then
+                return
+            end
+        end
+        for _, v in ipairs(Players:GetPlayers()) do
+            local thisPing = v:GetNetworkPing()
+            self.FiredBatchRemote:FireClient(v, nil, resolvedBullets, thisPing)
+        end
+
+        self:_fireBullets(nil, resolvedBullets, 0)
+
+    elseif RunService:IsClient() then
+        if not self.FiredBatchRemote then
+            warn("EasyBullet FiredBatch Remote doesn't exist. Did you forget to call EasyBullet.new() on the server?")
+            return
+        end
+
+        local shooter = Players.LocalPlayer
+
+        if self.ShouldFireArrayCallback then
+            local shouldFire = self.ShouldFireArrayCallback(shooter, resolvedBullets, 0)
+            assert(type(shouldFire) == "boolean", `The callback bound by EasyBullet:BindShouldFireArray must return a boolean, returned: {typeof(shouldFire)}`)
+            if shouldFire == false then
+                return
+            end
+        end
+
+        self.FiredBatchRemote:FireServer(resolvedBullets)
+        self:_fireBullets(shooter, resolvedBullets, 0)
+    end
+end
+
 function EasyBullet:BindCustomCast(callback: Bullet.CastCallback)
 	assert(typeof(callback) == "function", `The callback passed to EasyBullet:BindCustomCast must be a function. Passed type is {typeof(callback)}`)
 
@@ -182,6 +259,12 @@ function EasyBullet:BindShouldFire(callback: ShouldFireCallback)
 	assert(typeof(callback) == "function", `The callback passed to EasyBullet:BindShouldFire must be a function. Passed type is {typeof(callback)}`)
 
 	self.ShouldFireCallback = callback
+end
+
+function EasyBullet:BindShouldFireArray(callback: ShouldFireArrayCallback)
+    assert(typeof(callback) == "function", `The callback passed to EasyBullet:BindShouldFireArray must be a function. Passed type is {typeof(callback)}`)
+
+    self.ShouldFireArrayCallback = callback
 end
 
 function EasyBullet:_destroyBullet(bulletToDestroy: Bullet.Bullet | string)
@@ -265,13 +348,21 @@ function EasyBullet._fireBullet(self: EasyBullet, shootingPlayer: Player?, barre
 	self.Bullets[bulletId] = bullet
 end
 
+function EasyBullet._fireBullets(self: EasyBullet, shootingPlayer: Player?, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, ping: number)
+    for _, b in ipairs(bullets) do
+        self:_fireBullet(shootingPlayer, b.BarrelPosition, b.Velocity, ping, b.EasyBulletSettings)
+    end
+end
+
 function EasyBullet:_bindEvents()
 	-- Server
 	if RunService:IsServer() then
 
 		-- Look for existing EasyBulletFired RemoteEvent. Create one if it does not exist.
 		self.FiredRemote = self:_findOrCreateRemote("EasyBulletFired")
+		self.FiredBatchRemote = self:_findOrCreateRemote("EasyBulletFiredBatch")
 		assert(self.FiredRemote ~= nil, "self.FiredRemote cannot be nil.")
+		assert(self.FiredBatchRemote ~= nil, "self.FiredBatchRemote cannot be nil.")
 
 		self.FiredRemote.OnServerEvent:Connect(function(player: Player, barrelPos: Vector3, velocity: Vector3, easyBulletSettings: Bullet.EasyBulletSettings)
 			-- Sanity check params
@@ -299,6 +390,27 @@ function EasyBullet:_bindEvents()
 
 			-- Start handling the shot on the server
 			self:_fireBullet(player, barrelPos, velocity, ping, easyBulletSettings)
+		end)
+
+		-- Handle batch fired bullets from a client
+		self.FiredBatchRemote.OnServerEvent:Connect(function(player: Player, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } })
+			if type(bullets) ~= "table" then
+				warn(`{player.Name} passed a malformed bullets array to EasyBulletFiredBatch`)
+				return
+			end
+
+			local ping = player:GetNetworkPing()
+
+			-- replicate to others
+			for _, v in ipairs(Players:GetPlayers()) do
+				if v == player then continue end
+
+				local thisPing = v:GetNetworkPing()
+				self.FiredBatchRemote:FireClient(v, player, bullets, ping + thisPing)
+			end
+
+			-- start server-side for authoritative hit detection if used
+			self:_fireBullets(player, bullets, ping)
 		end)
 
 		-- Look for existing EasyBulletCanceled RemoteEvent. Create one if it does not exist.
@@ -332,6 +444,7 @@ function EasyBullet:_bindEvents()
 	elseif RunService:IsClient() then
 		-- Make references to our remotes
 		self.FiredRemote = ReplicatedStorage:WaitForChild("EasyBulletFired") :: RemoteEvent
+		self.FiredBatchRemote = ReplicatedStorage:WaitForChild("EasyBulletFiredBatch") :: RemoteEvent
 		self.CanceledRemote = ReplicatedStorage:WaitForChild(("EasyBulletCanceled")) :: RemoteEvent
 
 		if not self.FiredRemote then
@@ -339,7 +452,7 @@ function EasyBullet:_bindEvents()
 			return
 		end
 
-		if not self.CanceledRemote then
+		if not self.CanceledRemote or not self.FiredBatchRemote then
 			warn("No RemoteEvent named 'EasyBulletCanceled' found as a child of ReplicatedStorage")
 			return
 		end
@@ -352,6 +465,15 @@ function EasyBullet:_bindEvents()
 			end
 
 			self:_fireBullet(shootingPlayer, barrelPos, velocity, accumulatedPing, easyBulletSettings)
+		end)
+
+		-- Handle batch fired bullets
+		self.FiredBatchRemote.OnClientEvent:Connect(function(shootingPlayer: Player, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, accumulatedPing: number)
+			if shootingPlayer == Players.LocalPlayer then
+				return
+			end
+
+			self:_fireBullets(shootingPlayer, bullets, accumulatedPing)
 		end)
 
 		-- Handle the CanceledRemote
