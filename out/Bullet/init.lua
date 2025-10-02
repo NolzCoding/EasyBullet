@@ -37,6 +37,7 @@ type BulletProps = {
     StartTime: number,
     _bulletDraw: BulletDraw.BulletDraw?,
     _lastPosition: Vector3,
+    _frameCount: number,
 }
 
 local function raycast(v0: Vector3, v1: Vector3, rayparams: RaycastParams)
@@ -93,6 +94,7 @@ function Bullet.new(shootingPlayer: Player?, barrelPosition: Vector3, velocity: 
 
     self._lastPosition = barrelPosition
     self.StartTime = 0
+    self._frameCount = 0
 
     self.BulletHit = Signal.new()
     self.BelowFallenParts = Signal.new()
@@ -117,15 +119,24 @@ function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Ve
         return
     end
 
-    local rayResult
+    -- Only raycast every 4th frame to reduce unnecessary checks
+    self._frameCount = self._frameCount + 1
+    local shouldRaycast = (self._frameCount % 4 == 0)
 
-    if castCallback then
-        rayResult = castCallback(self.Shooter, lastPosition, currentPosition, elapsedTime, self.EasyBulletSettings.BulletData)
-    else
-        rayResult = raycast(lastPosition, currentPosition, self.RayParams)
+    local rayResult: RaycastResult? = nil
+
+    if shouldRaycast then
+        if castCallback then
+            rayResult = castCallback(self.Shooter, lastPosition, currentPosition, elapsedTime, self.EasyBulletSettings.BulletData)
+        else
+            rayResult = raycast(lastPosition, currentPosition, self.RayParams)
+        end
+
+        if rayResult then
+            self:_handleRayResult(rayResult)
+            return lastPosition, currentPosition
+        end
     end
-
-    self:_handleRayResult(rayResult)
 
     if self._bulletDraw then
         self._bulletDraw:Draw(lastPosition, currentPosition)
