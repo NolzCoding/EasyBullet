@@ -37,6 +37,7 @@ type BulletProps = {
     StartTime: number,
     _bulletDraw: BulletDraw.BulletDraw?,
     _lastPosition: Vector3,
+    _lastRaycastPosition: Vector3,
     _frameCount: number,
 }
 
@@ -93,6 +94,7 @@ function Bullet.new(shootingPlayer: Player?, barrelPosition: Vector3, velocity: 
     end
 
     self._lastPosition = barrelPosition
+    self._lastRaycastPosition = barrelPosition
     self.StartTime = 0
     self._frameCount = 0
 
@@ -127,15 +129,18 @@ function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Ve
 
     if shouldRaycast then
         if castCallback then
-            rayResult = castCallback(self.Shooter, lastPosition, currentPosition, elapsedTime, self.EasyBulletSettings.BulletData)
+            rayResult = castCallback(self.Shooter, self._lastRaycastPosition, currentPosition, elapsedTime, self.EasyBulletSettings.BulletData)
         else
-            rayResult = raycast(lastPosition, currentPosition, self.RayParams)
+            rayResult = raycast(self._lastRaycastPosition, currentPosition, self.RayParams)
         end
 
         if rayResult then
             self:_handleRayResult(rayResult)
             return lastPosition, currentPosition
         end
+
+        -- Update last raycast position to current position
+        self._lastRaycastPosition = currentPosition
     end
 
     if self._bulletDraw then
