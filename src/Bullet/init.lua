@@ -129,9 +129,9 @@ function Bullet.Update(self: Bullet, castCallback: CastCallback?): (Vector3?, Ve
 
     if shouldRaycast then
         if castCallback then
-            rayResult = castCallback(self.Shooter, currentPosition, self._lastRaycastPosition, elapsedTime, self.EasyBulletSettings.BulletData)
+            rayResult = castCallback(self.Shooter,self._lastRaycastPosition, currentPosition, elapsedTime, self.EasyBulletSettings.BulletData)
         else
-            rayResult = raycast( currentPosition, self._lastRaycastPosition, self.RayParams)
+            rayResult = raycast(self._lastRaycastPosition, currentPosition, self.RayParams)
         end
 
         if rayResult then
