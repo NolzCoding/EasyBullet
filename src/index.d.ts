@@ -74,5 +74,11 @@ interface EasyBulletConstructor {
 
 declare const EasyBullet: EasyBulletConstructor
 
-export { BulletData }
-export default EasyBullet
+declare namespace EasyBullet {
+	type BulletData = {
+		HitVelocity?: Vector3
+		BulletId: string
+	}
+}
+
+export = EasyBullet
