@@ -53,9 +53,19 @@ interface EasyBullet {
 	BindShouldFire(shouldFireCallback: ShouldFireCallback): void
 	BindShouldFireArray(shouldFireArrayCallback: ShouldFireArrayCallback): void
 
-	BulletHit: Signal // (shootingPlayer?: Player, raycastResult: RaycastResult, bulletData: BulletData)
-	BulletHitHumanoid: Signal // (shootingPlayer?: Player, raycastResult: RaycastResult, hitHumanoid: Humanoid, bulletData: BulletData)
-	BulletUpdated: Signal // (lastFramePosition: Vector3, thisFramePosition: Vector3, bulletData: BulletData)
+	BulletFired: Signal<
+		[shootingPlayer: Player | undefined, barrelPosition: Vector3, velocity: Vector3, bulletData: BulletData]
+	>
+	BulletHit: Signal<[shootingPlayer: Player | undefined, raycastResult: RaycastResult, bulletData: BulletData]>
+	BulletHitHumanoid: Signal<
+		[
+			shootingPlayer: Player | undefined,
+			raycastResult: RaycastResult,
+			hitHumanoid: Humanoid,
+			bulletData: BulletData,
+		]
+	>
+	BulletUpdated: Signal<[lastFramePosition: Vector3, thisFramePosition: Vector3, bulletData: BulletData]>
 }
 
 interface EasyBulletConstructor {

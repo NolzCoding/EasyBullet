@@ -18,6 +18,7 @@ export type ShouldFireArrayCallback = (shooter: Player?, bullets: { [number]: { 
 type EasyBulletProps = {
 	EasyBulletSettings: Bullet.EasyBulletSettings,
 
+	BulletFired: Signal.Signal<Player?, Vector3, Vector3, Bullet.BulletData>,
 	BulletHit: Signal.Signal<Player?, RaycastResult, Bullet.BulletData>,
 	BulletHitHumanoid: Signal.Signal<Player?, RaycastResult, Humanoid, Bullet.BulletData>,
 	BulletUpdated: Signal.Signal<Vector3, Vector3, Bullet.BulletData>,
@@ -108,6 +109,7 @@ function EasyBullet.new(easyBulletSettings: Bullet.EasyBulletSettings?)
 
 	self.EasyBulletSettings = overrideDefaults(easyBulletSettings or {})
 
+	self.BulletFired = Signal.new()
 	self.BulletHit = Signal.new()
 	self.BulletHitHumanoid = Signal.new()
 	self.BulletUpdated = Signal.new()
@@ -346,6 +348,9 @@ function EasyBullet._fireBullet(self: EasyBullet, shootingPlayer: Player?, barre
 	bullet:Start(ping)
 
 	self.Bullets[bulletId] = bullet
+
+	-- Fire the BulletFired signal
+	self.BulletFired:Fire(shootingPlayer, barrelPos, velocity, easyBulletSettings.BulletData)
 end
 
 function EasyBullet._fireBullets(self: EasyBullet, shootingPlayer: Player?, bullets: { [number]: { BarrelPosition: Vector3, Velocity: Vector3, EasyBulletSettings: Bullet.EasyBulletSettings } }, ping: number)

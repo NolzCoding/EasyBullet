@@ -5,18 +5,18 @@ interface SignalConnection {
 	Disconnect: () => void
 }
 
-interface Signal {
+interface Signal<T extends unknown[] = []> {
 	/**
 	 * Fires the event represented by this Signal object. Calls all connected callbacks.
 	 * @param args variadic arguments passed to all connected callbacks
 	 */
-	Fire(...args: unknown[]): void
+	Fire(...args: T): void
 
 	/**
 	 * Connect a callback function to the event represented by this Signal object.
 	 * @param callback Callback function that is passed the variadic arguments passed to Fire() when it is called.
 	 */
-	Connect(callback: (...args: unknown[]) => void): SignalConnection
+	Connect(callback: (...args: T) => void): SignalConnection
 
 	/**
 	 * Disconnect all SignalConnection's currently made to the event represented by this Signal object.
@@ -25,7 +25,7 @@ interface Signal {
 }
 
 interface SignalConstructor {
-	new (): Signal
+	new <T extends unknown[] = []>(): Signal<T>
 }
 
 declare const Signal: SignalConstructor
