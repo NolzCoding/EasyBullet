@@ -74,4 +74,5 @@ interface EasyBulletConstructor {
 
 declare const EasyBullet: EasyBulletConstructor
 
-export = EasyBullet
+export { BulletData }
+export default EasyBullet
